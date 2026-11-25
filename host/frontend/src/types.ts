@@ -11,11 +11,11 @@ export interface Protection {
 export interface Waveform { ts_ms: number; v_samples: number[]; i_samples: number[] }
 export interface Nilm {
   ts_ms: number; active_mask: number; est_power_w: number[]; est_energy_wh?: number[]; confidence: number[]; unknown_power_w: number;
-  last_mahalanobis: number; inference_us: number
+  last_mahalanobis: number; inference_us: number; last_event_id?: number; last_event_type?: number
 }
 export interface Health { ts_ms: number; dsp_exec_us: number; max_dsp_us: number; dropped_frames: number; uart_crc_err: number; nvs_records: number; free_stack_min: number }
 export interface FaultRecord { record_id: number; ts_ms: number; fault_code: number; relay_result: number; trigger_val: number; threshold_val: number; v_src_v: number; v_load_v: number; verify_ms: number; mode?: string }
 export interface GridData {
   mode: Mode | null; connected: boolean; statusText: string; telemetry: Telemetry | null; protection: Protection | null;
-  waveform: Waveform | null; nilm: Nilm | null; health: Health | null; history: Array<{ ts: number; source: number; load: number }>
+  waveform: Waveform | null; nilm: Nilm | null; health: Health | null; lastFrameAt: number | null; history: Array<{ ts: number; source: number; load: number }>
 }

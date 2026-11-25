@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgridguard_core.a CMakeFiles/gridguard_core.dir/src/gg_plant.c.o CMakeFiles/gridguard_core.dir/src/gg_metrology.c.o CMakeFiles/gridguard_core.dir/src/gg_protection.c.o CMakeFiles/gridguard_core.dir/src/gg_relay_fsm.c.o CMakeFiles/gridguard_core.dir/src/gg_nilm.c.o CMakeFiles/gridguard_core.dir/src/gg_protocol.c.o
+/usr/bin/ranlib libgridguard_core.a

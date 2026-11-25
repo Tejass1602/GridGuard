@@ -1,0 +1,2 @@
+core_acceptance 2 0.000502282
+---

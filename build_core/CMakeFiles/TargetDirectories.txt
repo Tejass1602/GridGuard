@@ -1,0 +1,5 @@
+/home/tejas/Projects/GridGuard/build_core/CMakeFiles/gridguard_core.dir
+/home/tejas/Projects/GridGuard/build_core/CMakeFiles/test_core.dir
+/home/tejas/Projects/GridGuard/build_core/CMakeFiles/test.dir
+/home/tejas/Projects/GridGuard/build_core/CMakeFiles/edit_cache.dir
+/home/tejas/Projects/GridGuard/build_core/CMakeFiles/rebuild_cache.dir

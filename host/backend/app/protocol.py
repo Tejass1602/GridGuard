@@ -124,7 +124,7 @@ def decode_message(frame: Frame) -> dict[str, Any]:
         return {"kind": "waveform", "ts_ms": ts, "v_samples": list(samples[:64]), "i_samples": list(samples[64:])}
     if frame.msg_type == 0x04:
         vals = _unpack("<IBBBB10fI", p)
-        return {"kind": "nilm", "ts_ms": vals[0], "active_mask": vals[1], "last_event_id": vals[2], "last_event_type": vals[3], "est_power_w": list(vals[4:8]), "confidence": list(vals[8:12]), "unknown_power_w": vals[12], "last_mahalanobis": vals[13], "inference_us": vals[14]}
+        return {"kind": "nilm", "ts_ms": vals[0], "active_mask": vals[1], "last_event_id": vals[2], "last_event_type": vals[3], "est_power_w": list(vals[5:9]), "confidence": list(vals[9:13]), "unknown_power_w": vals[13], "last_mahalanobis": vals[14], "inference_us": vals[15]}
     if frame.msg_type == 0x05:
         vals = _unpack("<IBBBBBBHffI", p)
         return {"kind": "protection", "ts_ms": vals[0], "relay_state": vals[1], "active_fault": vals[2], "coil_cmd": vals[3], "aux_state": vals[4], "feedback_mode": vals[5], "verify_samples": vals[6], "v_src_v": vals[8], "v_load_v": vals[9], "trip_latency_us": vals[10]}

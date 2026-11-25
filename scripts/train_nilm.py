@@ -39,7 +39,7 @@ def measures(v, i):
     # DFT phasor convention yields Q positive for lagging current.
     def phasor(z, k): return (z[k].real*scale, -z[k].imag*scale)
     vr1,vi1=phasor(bins,1); ir1,ii1=phasor(ibins,1)
-    q=vi1*ir1-vr1*ii1
+    q=vr1*ii1-vi1*ir1
     ih=np.array([np.sqrt(2)*abs(ibins[h])/N for h in (1,3,5,7,9,11)])
     return np.array([vr,ir,p,q,vr*ir]), ih
 
@@ -49,11 +49,11 @@ def event_features(rng, cls):
     elapsed=rng.uniform(.3,3,4)
     pre_v,pre_i=cycle(vrms,hz,active,elapsed,rng,0.8)
     post_active=active.copy(); post_active[cls]=True
-    post_elapsed=elapsed.copy(); post_elapsed[cls]=rng.uniform(.0,.012)
+    post_elapsed=elapsed.copy(); post_elapsed[cls]=rng.uniform(.36,.50)
     # Randomized appliance tolerance affects the event current, while background remains common.
     saved=IRMS[cls]; IRMS[cls]=saved*tol
     post_v,post_i=cycle(vrms,hz,post_active,post_elapsed,rng,0.8)
-    peak_elapsed=post_elapsed.copy()
+    peak_elapsed=post_elapsed.copy(); peak_elapsed[cls]=rng.uniform(.02,.06)
     peak_v,peak_i=cycle(vrms,hz,post_active,peak_elapsed,rng,.8)
     IRMS[cls]=saved
     pre,preh=measures(pre_v,pre_i); post,posth=measures(post_v,post_i); peak,_=measures(peak_v,peak_i)
@@ -62,7 +62,7 @@ def event_features(rng, cls):
     ratios=(posth-preh)/max(posth[0]-preh[0],.05)
     dthd=(np.linalg.norm(posth[1:])/max(posth[0],.05)-np.linalg.norm(preh[1:])/max(preh[0],.05))
     # Event envelope sampled at its first cycle; the inrush coefficient is part of the plant equation.
-    inrush=KAPPA[cls]+rng.normal(0,.035)
+    inrush=max(peak[1]-pre[1],0.0)/max(abs(posth[0]-preh[0]),.05)
     return np.array([abs(dp),dq,abs(ds),dp/max(np.hypot(dp,dq),1),ratios[1],ratios[2],ratios[3],dthd,inrush, np.sign(dq)*abs(dq)/max(abs(dp),1)],dtype=np.float32)
 
 def softmax(x):

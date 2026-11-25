@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/tejas/Projects/GridGuard/build_core/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

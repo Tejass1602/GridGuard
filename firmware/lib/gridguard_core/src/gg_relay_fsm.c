@@ -22,4 +22,4 @@ void gg_relay_step(gg_relay_fsm_t *f,uint32_t dt,float src,float load,int aux_hi
   if(f->samples>=5){f->state=NORMAL_CLOSED;return;}
   if(f->elapsed_ms>=600){f->coil_cmd=0;f->state=CLOSE_FAILURE;}}
 }
-int gg_relay_request_reset(gg_relay_fsm_t *f,int clear,float src){if(!f||!clear||src<3||(f->state!=PHYSICAL_DISCONNECT_CONFIRMED&&f->state!=BOOT_SAFE_OPEN))return 0;f->fault_active=0;f->state=RESET_CHECK;return 1;}
+int gg_relay_request_reset(gg_relay_fsm_t *f,int clear,float src){if(!f||!clear||src<3||(f->state!=PHYSICAL_DISCONNECT_CONFIRMED&&f->state!=BOOT_SAFE_OPEN&&f->state!=TRIP_FAILURE&&f->state!=DISCONNECT_UNVERIFIED&&f->state!=CLOSE_FAILURE))return 0;f->fault_active=0;f->state=RESET_CHECK;return 1;}

@@ -1,0 +1,19 @@
+Start testing: Nov 25 21:55 IST
+----------------------------------------------------------
+1/1 Testing: core_acceptance
+1/1 Test: core_acceptance
+Command: "/home/tejas/Projects/GridGuard/build_core/test_core"
+Directory: /home/tejas/Projects/GridGuard/build_core
+"core_acceptance" start time: Nov 25 21:55 IST
+Output:
+----------------------------------------------------------
+T1-T5 core acceptance passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"core_acceptance" end time: Nov 25 21:55 IST
+"core_acceptance" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 25 21:55 IST
