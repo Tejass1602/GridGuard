@@ -13,10 +13,10 @@ typedef struct {gg_fault_code_t fault;gg_relay_state_t result;float value,thresh
 K_MSGQ_DEFINE(fault_q,sizeof(fault_event_t),8,4);
 static struct k_timer cycle_timer;
 static K_THREAD_STACK_DEFINE(dsp_stack,4096);static struct k_thread dsp_thread;
-static K_THREAD_STACK_DEFINE(relay_stack,2048);static struct k_thread relay_thread;
+static K_THREAD_STACK_DEFINE(relay_stack,4096);static struct k_thread relay_thread;
 static K_THREAD_STACK_DEFINE(nilm_stack,4096);static struct k_thread nilm_thread;
 static K_THREAD_STACK_DEFINE(comms_stack,4096);static struct k_thread comms_thread;
-static K_THREAD_STACK_DEFINE(nvs_stack,2048);static struct k_thread nvs_thread;
+static K_THREAD_STACK_DEFINE(nvs_stack,4096);static struct k_thread nvs_thread;
 static void timer_expiry(struct k_timer *timer){ARG_UNUSED(timer);k_sem_give(&dsp_tick);k_sem_give(&relay_tick);}
 static void dsp_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);gg_adc_sample_t window[64];gg_metrics_t m;unsigned n;int rc;uint32_t start,elapsed;static unsigned stale_windows;
  while(1){k_sem_take(&dsp_tick,K_FOREVER);start=k_cycle_get_32();for(n=0;n<64;n++)window[n]=gg_plant_step(&gg_app.plant,NULL,NULL);memcpy(gg_app.waveform,window,sizeof(window));
@@ -25,7 +25,7 @@ static void dsp_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_U
   if(gg_app.fault!=FAULT_NONE&&gg_app.relay.state==NORMAL_CLOSED){gg_app.trip_started_cycle=k_cycle_get_32();gg_relay_request_trip(&gg_app.relay,1);fault_event_t e={gg_app.fault,gg_app.relay.state,m.i_rms,12,0,0,gg_app.timestamp_ms};if(k_msgq_put(&fault_q,&e,K_NO_WAIT)!=0)gg_app.dropped_frames++;}
   if(k_msgq_put(&metrics_q,&m,K_NO_WAIT)!=0)gg_app.dropped_frames++;
   if(gg_app.relay.state==TRIP_FAILURE||gg_app.relay.state==CLOSE_FAILURE)gg_hal_status_led(1);
-  elapsed=k_cycle_get_32()-start;gg_app.dsp_exec_us=k_cyc_to_us_floor32(elapsed);if(gg_app.dsp_exec_us>gg_app.max_dsp_us)gg_app.max_dsp_us=gg_app.dsp_exec_us;
+  elapsed=k_cycle_get_32()-start;gg_app.dsp_exec_us=k_cyc_to_us_floor32(elapsed);if(gg_app.dsp_exec_us>gg_app.max_dsp_us)gg_app.max_dsp_us=gg_app.dsp_exec_us;k_msleep(5);
  }}
 static void relay_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);float src=0,load=0;int aux=1,rc;gg_relay_state_t old;
  while(1){k_sem_take(&relay_tick,K_FOREVER);old=gg_app.relay.state;
@@ -34,9 +34,9 @@ static void relay_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG
    if(gg_app.feedback_mode==FEEDBACK_VIRTUAL_WELDED)load=12;else load=gg_app.relay.coil_cmd?12:0;aux=1;}
   gg_relay_step(&gg_app.relay,20,src,load,aux);
   gg_hal_set_coil(gg_app.relay.coil_cmd);
-  if(old!=gg_app.relay.state){if(gg_app.trip_started_cycle&&(gg_app.relay.state==PHYSICAL_DISCONNECT_CONFIRMED||gg_app.relay.state==TRIP_FAILURE||gg_app.relay.state==DISCONNECT_UNVERIFIED)){gg_app.trip_latency_us=k_cyc_to_us_floor32(k_cycle_get_32()-gg_app.trip_started_cycle);gg_app.trip_started_cycle=0;}fault_event_t e={gg_app.fault,gg_app.relay.state,0,0,src,load,k_uptime_get_32()};(void)k_msgq_put(&fault_q,&e,K_NO_WAIT);gg_comms_send_protection();}
+  if(old!=gg_app.relay.state){if(gg_app.trip_started_cycle&&(gg_app.relay.state==PHYSICAL_DISCONNECT_CONFIRMED||gg_app.relay.state==TRIP_FAILURE||gg_app.relay.state==DISCONNECT_UNVERIFIED)){gg_app.trip_latency_us=k_cyc_to_us_floor32(k_cycle_get_32()-gg_app.trip_started_cycle);gg_app.trip_started_cycle=0;}if(gg_app.fault!=FAULT_NONE||gg_app.relay.state==PHYSICAL_DISCONNECT_CONFIRMED||gg_app.relay.state==TRIP_FAILURE){fault_event_t e={gg_app.fault,gg_app.relay.state,0,0,src,load,k_uptime_get_32()};(void)k_msgq_put(&fault_q,&e,K_NO_WAIT);}gg_comms_send_protection();}
  }}
-static void nilm_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);gg_cusum_t cusum;gg_metrics_t m,history[10],capture[25];unsigned history_count=0,history_pos=0,capture_count=0,j;int event,was_capture;gg_cusum_init(&cusum);gg_nilm_tracker_init(&gg_app.nilm);memset(history,0,sizeof(history));
+static void nilm_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);gg_cusum_t cusum;gg_metrics_t m; static gg_metrics_t history[10],capture[25];unsigned history_count=0,history_pos=0,capture_count=0,j;int event,was_capture;gg_cusum_init(&cusum);gg_nilm_tracker_init(&gg_app.nilm);memset(history,0,sizeof(history));
  while(1){if(k_msgq_get(&metrics_q,&m,K_FOREVER)!=0)continue;was_capture=cusum.capture>0;if(was_capture&&capture_count<25)capture[capture_count++]=m;event=gg_cusum_step(&cusum,m.p_w,m.q1_var);
   if(cusum.capture==25&&!was_capture)capture_count=0;
   if(event){gg_metrics_t pre={0},post={0};float features[10],peak=0,di1,dp,dq,ds;unsigned count=history_count<10?history_count:10;
@@ -50,18 +50,19 @@ static void nilm_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_
   }
   history[history_pos]=m;history_pos=(history_pos+1)%10;if(history_count<10)history_count++;
  }}
-static void comms_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);while(1){gg_comms_rx_task();gg_comms_send_telemetry();k_sleep(K_MSEC(50));}}
+static void comms_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);while(1){static unsigned led_cnt=0;if(++led_cnt%10==0)gg_hal_status_led((led_cnt/10)&1);gg_comms_rx_task();gg_comms_send_telemetry();k_sleep(K_MSEC(50));}}
 static void nvs_entry(void *a,void *b,void *c){ARG_UNUSED(a);ARG_UNUSED(b);ARG_UNUSED(c);fault_event_t e;while(1){if(k_msgq_get(&fault_q,&e,K_FOREVER)==0)(void)gg_store_fault(e.fault,e.result,e.value,e.threshold,e.source,e.load,e.timestamp);}}
 int main(void){int rc,hal_rc;
- memset(&gg_app,0,sizeof(gg_app));gg_app.feedback_mode=FEEDBACK_VIRTUAL_OK;gg_relay_init(&gg_app.relay,(gg_feedback_mode_t)gg_app.feedback_mode);gg_app.relay.aux_enabled=1;gg_protection_init(&gg_app.protection);gg_plant_init(&gg_app.plant,42);gg_metrology_init();
- hal_rc=gg_hal_init();if(hal_rc)LOG_ERR("HAL initialization failed: %d",hal_rc);gg_hal_set_coil(0);gg_hal_status_led(0);
+ memset(&gg_app,0,sizeof(gg_app));gg_app.feedback_mode=FEEDBACK_VIRTUAL_OK;gg_relay_init(&gg_app.relay,(gg_feedback_mode_t)gg_app.feedback_mode);gg_app.relay.aux_enabled=0;gg_protection_init(&gg_app.protection);gg_plant_init(&gg_app.plant,42);gg_metrology_init();
+ hal_rc=gg_hal_init();if(hal_rc)LOG_ERR("HAL initialization failed: %d",hal_rc);gg_hal_set_coil(0);gg_hal_status_led(1);
  rc=gg_store_init();if(rc)LOG_ERR("NVS initialization failed: %d",rc);
  if(gg_app.relay.state==BOOT_SAFE_OPEN&&!gg_store_has_latched_fault())gg_relay_self_test_complete(&gg_app.relay,rc==0&&hal_rc==0);
  (void)gg_comms_init();
- k_thread_create(&dsp_thread,dsp_stack,K_THREAD_STACK_SIZEOF(dsp_stack),dsp_entry,NULL,NULL,NULL,2,0,K_NO_WAIT);k_thread_name_set(&dsp_thread,"gg_dsp_prot");
- k_thread_create(&relay_thread,relay_stack,K_THREAD_STACK_SIZEOF(relay_stack),relay_entry,NULL,NULL,NULL,3,0,K_NO_WAIT);k_thread_name_set(&relay_thread,"gg_relay_ver");
- k_thread_create(&nilm_thread,nilm_stack,K_THREAD_STACK_SIZEOF(nilm_stack),nilm_entry,NULL,NULL,NULL,5,0,K_NO_WAIT);k_thread_name_set(&nilm_thread,"gg_nilm");
- k_thread_create(&comms_thread,comms_stack,K_THREAD_STACK_SIZEOF(comms_stack),comms_entry,NULL,NULL,NULL,6,0,K_NO_WAIT);k_thread_name_set(&comms_thread,"gg_comms");
+ k_sleep(K_MSEC(500));
+ k_thread_create(&dsp_thread,dsp_stack,K_THREAD_STACK_SIZEOF(dsp_stack),dsp_entry,NULL,NULL,NULL,3,K_FP_REGS,K_NO_WAIT);k_thread_name_set(&dsp_thread,"gg_dsp_prot");
+ k_thread_create(&relay_thread,relay_stack,K_THREAD_STACK_SIZEOF(relay_stack),relay_entry,NULL,NULL,NULL,3,K_FP_REGS,K_NO_WAIT);k_thread_name_set(&relay_thread,"gg_relay_ver");
+ k_thread_create(&nilm_thread,nilm_stack,K_THREAD_STACK_SIZEOF(nilm_stack),nilm_entry,NULL,NULL,NULL,3,K_FP_REGS,K_NO_WAIT);k_thread_name_set(&nilm_thread,"gg_nilm");
+ k_thread_create(&comms_thread,comms_stack,K_THREAD_STACK_SIZEOF(comms_stack),comms_entry,NULL,NULL,NULL,3,K_FP_REGS,K_NO_WAIT);k_thread_name_set(&comms_thread,"gg_comms");
  k_thread_create(&nvs_thread,nvs_stack,K_THREAD_STACK_SIZEOF(nvs_stack),nvs_entry,NULL,NULL,NULL,8,0,K_NO_WAIT);k_thread_name_set(&nvs_thread,"gg_nvs_log");
  k_timer_init(&cycle_timer,timer_expiry,NULL);k_timer_start(&cycle_timer,K_MSEC(20),K_MSEC(20));LOG_INF("GridGuard internal-plant mode ready");return 0;
 }

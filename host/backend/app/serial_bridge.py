@@ -82,12 +82,16 @@ class SerialBridge:
             else:
                 selected = self.port_override
         else:
-            matched = [p for p in candidates if p.vid == 0x2E8A or "pico" in (p.description or "").lower() or "zephyr" in (p.description or "").lower()]
+            matched = [p for p in candidates if p.vid in (0x2E8A, 0x2FE3) or "pico" in (p.description or "").lower() or "zephyr" in (p.description or "").lower()]
             if not matched:
                 return None
             selected = matched[0].device
         try:
-            return serial.Serial(selected, 115200, timeout=.2, write_timeout=.5)
+            ser = serial.Serial(selected, 115200, timeout=.2, write_timeout=.5)
+            ser.dtr = True
+            ser.rts = True
+            print(f"[GridGuard] Connected to {selected}", flush=True)
+            return ser
         except (OSError, serial.SerialException):
             return None
 
@@ -102,16 +106,20 @@ class SerialBridge:
         if self.replay:
             self.replay.command(kind, payload)
             return True
-        specs = {
-            "appliance": (0x10, struct.pack("<BB", payload["appliance_id"], int(payload["target_state"]))),
-            "fault": (0x11, struct.pack("<Bf", payload["fault_scenario"], payload["magnitude"])),
-            "reset-relay": (0x12, struct.pack("<B", int(payload["force_clear_latch"]))),
-            "feedback-mode": (0x13, struct.pack("<B", payload["feedback_mode"])),
-            "read-faults": (0x14, struct.pack("<HH", payload["start_index"], payload["count"])),
-        }
         if self.serial is None:
             return False
-        msg_type, body = specs[kind]
+        if kind == "appliance":
+            msg_type, body = 0x10, struct.pack("<BB", payload["appliance_id"], int(payload["target_state"]))
+        elif kind == "fault":
+            msg_type, body = 0x11, struct.pack("<Bf", payload["fault_scenario"], payload["magnitude"])
+        elif kind == "reset-relay":
+            msg_type, body = 0x12, struct.pack("<B", int(payload["force_clear_latch"]))
+        elif kind == "feedback-mode":
+            msg_type, body = 0x13, struct.pack("<B", payload["feedback_mode"])
+        elif kind == "read-faults":
+            msg_type, body = 0x14, struct.pack("<HH", payload["start_index"], payload["count"])
+        else:
+            return False
         wire = encode_frame(msg_type, self.seq, body)
         self.seq = (self.seq + 1) & 0xFFFF
         try:
